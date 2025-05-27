@@ -14,8 +14,18 @@ function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query })
     });
+//    const data = await res.json();
+//    setAnswer(data.result);
     const data = await res.json();
-    setAnswer(data.result);
+    // If the result is an object (e.g. from agent.invoke), extract .output or stringify
+    let answerText;
+    if (data.result && typeof data.result === "object") {
+      // prefer the `output` property
+      answerText = data.result.output ?? JSON.stringify(data.result);
+    } else {
+      answerText = data.result;
+    }
+    setAnswer(answerText);
     if (data.chart) {
       setChartData(data.chart.data);
       setChartType(data.chart.type);

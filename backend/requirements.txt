@@ -1,7 +1,8 @@
 fastapi
 uvicorn[standard]
 langchain
-pandas
 mlxtend
-python-dateparser
+dateparser
 google-generativeai
+langchain-community
+langchain-google-genai

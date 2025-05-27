@@ -4,10 +4,17 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 # TODO: Replace ChatOpenAI with actual Google Gemini integration
-from langchain.chat_models import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import initialize_agent, Tool
 from langchain.agents.agent_types import AgentType
 from tools import segment_customers, find_bundles, analyze_marketing
+
+import logging, traceback
+from fastapi.responses import JSONResponse
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 app.add_middleware(
@@ -27,7 +34,10 @@ def startup_event():
         raise Exception("GEMINI_API_KEY is not set")
     global agent
     # Using ChatOpenAI as placeholder; replace with Google Gemini model in production
-    llm = ChatOpenAI(temperature=0, openai_api_key=api_key)
+    llm = ChatGoogleGenerativeAI(
+        model = "gemini-1.5-pro",  # or "gemini-pro"
+        google_api_key = api_key
+    )
     tools = [
         Tool(name="segment_customers", func=segment_customers,
              description="Segment customers by RFM metrics."),
@@ -38,10 +48,40 @@ def startup_event():
     ]
     agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
+# @app.post("/query")
+# async def query(request: QueryRequest):
+#     try:
+#         result = agent.run(request.query)
+#         return {"result": result}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/query")
 async def query(request: QueryRequest):
     try:
-        result = agent.run(request.query)
-        return {"result": result}
+        # If you want to silence the deprecation warning, you could later switch to agent.invoke()
+        agent_response = agent.invoke(request.query)
+        # result = agent_response.output if hasattr(agent_response, "output") else agent_response
+
+        # If it has an `.output` attribute, use that; otherwise stringify
+        if hasattr(agent_response, "output"):
+            final = agent_response.output
+        elif isinstance(agent_response, dict) and "output" in agent_response:
+            final = agent_response["output"]
+        else:
+            final = str(agent_response)
+        return {"result": final}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Log full traceback to container logs
+        tb = traceback.format_exc()
+        logger.error(f"Error while running agent:\n{tb}")
+        # Return the error message (and optionally traceback) in the HTTP response
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                # "traceback": tb  # you can include this if you want it on the client
+            }
+        )
+

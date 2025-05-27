@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ~/Documents/Netelixir/AI ignition/langchain_demo/ai_ignition_616.db:/app/data/ai_ignition.db:ro
+      - ~/Documents/Netelixir/AI ignition/langchain_demo/ai_ignition_616.db:/app/data/ai_ignition_616.db:ro
     ports:
       - "8000:8000"
   frontend:
