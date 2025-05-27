@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    container_name: langchain_backend
+    env_file:
+      - .env
+    volumes:
+      - ~/Documents/Netelixir/AI ignition/langchain_demo/ai_ignition_616.db:/app/data/ai_ignition.db:ro
+    ports:
+      - "8000:8000"
+  frontend:
+    build: ./frontend
+    container_name: langchain_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
