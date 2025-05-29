@@ -1,5 +1,6 @@
 // App.js
 import React, { useState } from 'react';
+import { Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -9,6 +10,8 @@ import {
   LineChart, Line,
   XAxis, YAxis, Tooltip
 } from 'recharts';
+
+// MUI imports
 import {
   Container,
   Box,
@@ -27,31 +30,28 @@ function App() {
   const handleSubmit = async () => {
     if (!query.trim()) return;
     setAnswer("Thinking...");
-    try {
-      const res = await fetch("http://localhost:8000/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query })
-      });
-      const data = await res.json();
-      let answerText;
-      if (data.result && typeof data.result === "object") {
-        answerText = data.result.output ?? JSON.stringify(data.result, null, 2);
-      } else {
-        answerText = data.result || data.summary || JSON.stringify(data);
-      }
-      setAnswer(answerText);
+    const res = await fetch("http://localhost:8000/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    // unwrap answer
+    let answerText;
+    if (data.result && typeof data.result === "object") {
+      answerText = data.result.output ?? JSON.stringify(data.result, null, 2);
+    } else {
+      answerText = data.result || data.summary || JSON.stringify(data);
+    }
+    setAnswer(answerText);
 
-      if (data.chart) {
-        setChartData(data.chart.data);
-        setChartType(data.chart.type);
-      } else {
-        setChartData(null);
-        setChartType(null);
-      }
-    } catch (err) {
-      setAnswer("Error fetching response.");
-      console.error(err);
+    // chart
+    if (data.chart) {
+      setChartData(data.chart.data);
+      setChartType(data.chart.type);
+    } else {
+      setChartData(null);
+      setChartType(null);
     }
   };
 
@@ -60,7 +60,30 @@ function App() {
       handleSubmit();
     }
   };
-
+// Helper: take a string, split on **bold**, and return array of React nodes
+   const renderInline = (text) => {
+     const parts = text.split(/(\*\*[^*] \*\*)/g).filter(Boolean);
+     return parts.map((part, i) => {
+       const match = part.match(/^\*\*(. )\*\*$/);
+       if (match) {
+         return (
+           <Typography
+             component="span"
+             variant="body1"
+             key={i}
+             sx={{ fontWeight: 'bold' }}
+           >
+             {match[1]}
+           </Typography>
+         );
+       }
+       return (
+         <Typography component="span" variant="body1" key={i}>
+           {part}
+         </Typography>
+       );
+     });
+   };
   const renderChart = () => {
     if (!chartData || !chartType) return null;
     const data = Object.entries(chartData).map(([name, value]) => ({ name, value }));
@@ -102,21 +125,79 @@ function App() {
     }
   };
 
+// Render the LLM’s summary with real paragraphs and lists
+//  const renderAnswer = () => {
+//    if (!answer) return null;
+//    // split on newlines
+////    const lines = answer.split('\n');
+//    // convert literal "\n" into real newlines, then split
+//    const text = answer.replace(/\\n/g, '\n');
+//    const lines = text.split('\n');
+//    const elements = [];
+//    let listItems = [];
+//
+//     const flushList = () => {
+//       if (listItems.length > 0) {
+//         elements.push(
+//           <Box component="ul" key={`ul-${elements.length}`} sx={{ pl: 4, mb: 2 }}>
+//             {listItems.map((item, i) => (
+//              <Typography
+//                component="li"
+//                variant="body1"
+//                key={`li-${i}`}
+//                sx={{ mb: 0.5 }}
+//              >
+//                {renderInline(item)}
+//              </Typography>
+//            ))}
+//           </Box>
+//         );
+//         listItems = [];
+//       }
+//     };
+//
+//     lines.forEach((raw, idx) => {
+//       const line = raw.trim();
+//       if (!line) {
+//         // blank line: break current list and add spacing
+//         flushList();
+//         elements.push(<Box key={`br-${idx}`} sx={{ height: 8 }} />);
+//       } else if (/^[-*]\s /.test(line)) {
+//         // bullet line
+//         listItems.push(line.replace(/^[-*]\s /, ''));
+//       } else {
+//         // normal text: flush any pending list, then add paragraph
+//         flushList();
+//         elements.push(
+//           <Typography variant="body1" paragraph key={`p-${idx}`}>
+//             {renderInline(line)}
+//           </Typography>
+//         );
+//       }
+//     });
+//     // flush at end
+//     flushList();
+//     return elements;
+//   };
+
+  // Turn literal “\n” into real linebreaks, then render markdown
   const renderAnswer = () => {
     if (!answer) return null;
-    // Turn literal "\n" into real newlines
     const text = answer.replace(/\\n/g, '\n');
     return (
       <Box
         component={Paper}
         elevation={2}
-        sx={{ p: 3, mb: 4, borderRadius: '20px', bgcolor: 'background.paper' }}
+        sx={{ p: 3, mb: 4, borderRadius: '38px', bgcolor: 'background.paper' }}
       >
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            // Use MUI Typography for paragraphs
             p: ({node, ...props}) => <Typography variant="body1" paragraph {...props} />,
+            // Use MUI Typography for list items
             li: ({node, ...props}) => <Typography component="li" variant="body1" {...props} />,
+            // Render unordered lists with proper padding
             ul: ({node, ...props}) => <Box component="ul" sx={{pl:4, mb:2}} {...props} />,
           }}
         >
@@ -126,6 +207,15 @@ function App() {
     );
   };
 
+  return (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* …header, input panel… */}
+      {renderAnswer()}
+      {/* …chart… */}
+    </Container>
+  );
+}
+}
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       {/* Header */}
@@ -148,7 +238,7 @@ function App() {
           mb: 4,
           display: 'flex',
           alignItems: 'center',
-          borderRadius: '38px',
+          borderRadius: 20,
           boxShadow: theme => theme.shadows[4],
         }}
       >
@@ -161,8 +251,8 @@ function App() {
           onKeyDown={onKeyDown}
           sx={{
             bgcolor: 'background.paper',
-            '& .MuiOutlinedInput-root': {
-              borderRadius: '30px',
+            '& .MuiOutlinedInput-root' : {
+            borderRadius: 20,
             },
             mr: 2,
           }}
@@ -171,12 +261,13 @@ function App() {
           variant="contained"
           size="medium"
           onClick={handleSubmit}
+          onKeyDown={onKeyDown}
           sx={{
             bgcolor: '#f58120',
             color: '#fff',
             px: 3,
             py: 1.5,
-            borderRadius: '38px',
+            borderRadius: 38,
             boxShadow: theme => theme.shadows[2],
             transition: 'transform 0.1s ease-in-out, box-shadow 0.2s',
             '&:hover': {
@@ -192,7 +283,18 @@ function App() {
       </Paper>
 
       {/* Answer */}
-      {renderAnswer()}
+      <Paper
+        elevation={2}
+        sx={{
+          p: 3,
+          mb: 4,
+          borderRadius: '15px',
+          bgcolor: 'background.paper'
+        }}
+      >
+        {renderAnswer()}
+      </Paper>
+
 
       {/* Chart */}
       {renderChart()}
